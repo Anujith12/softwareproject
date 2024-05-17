@@ -422,7 +422,7 @@ def main(window):
     block_size = 96
 
     player = Player(-1500, 500, 50, 50)
-    player1_positions = [(-900, -100), (192,200), (1050, 100),(2000,100)]  # Define positions for Player1
+    player1_positions = [(-900, -100), (192,200), (1050, 100),(1718,100),(2115,100)]  # Define positions for Player1
     players1 = [Player1(x, y, 50, 50) for x, y in player1_positions]  # Create Player1 instances
 
     fire = Fire(100, HEIGHT - block_size - 64, 16, 32)
@@ -436,11 +436,11 @@ def main(window):
         *[
             Block(x, HEIGHT - block_size - y, block_size)
             for x, y in [(-1100, 210), (-800, 400), (-895, 400), (-705, 400), (-610, 400), (192, 288), (384, 288),
-                          (480, 288),(1440,100)]
+                          (480, 288),(2120,260),(2120,355),(2215,260),(2215,355)]
         ]
     ]
  # Define the coordinates of blocks to delete
-    blocks_to_delete = [(480,0),(384,0),(192,0),(288,0),(864,0),(768,0),(960,0)]
+    blocks_to_delete = [(480,0),(384,0),(192,0),(288,0),(864,0),(768,0),(960,0),(1440,0),(1536,0),(1632,0)]
 
     # Remove blocks at specified coordinates from the floor
     for x, y in blocks_to_delete:
