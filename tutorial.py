@@ -4,6 +4,7 @@ import math
 import pygame
 from os import listdir
 from os.path import isfile, join
+
 pygame.init()
 
 pygame.display.set_caption("Platformer")
@@ -246,6 +247,25 @@ class Player1(pygame.sprite.Sprite):
     def draw(self, win, offset_x):
         win.blit(self.sprite, (self.rect.x - offset_x, self.rect.y))
 
+    def handle_movement(self, objects):
+        keys = pygame.key.get_pressed()
+
+        self.x_vel = 0
+        collide_left = collide(self, objects, -PLAYER_VEL * 2)
+        collide_right = collide(self, objects, PLAYER_VEL * 2)
+
+        if keys[pygame.K_a] and not collide_left:  # Use 'A' for moving left
+            self.move_left(PLAYER_VEL)
+        if keys[pygame.K_d] and not collide_right:  # Use 'D' for moving right
+            self.move_right(PLAYER_VEL)
+
+        vertical_collide = handle_vertical_collision(self, objects, self.y_vel)
+        to_check = [collide_left, collide_right, *vertical_collide]
+
+        for obj in to_check:
+            if obj and obj.name == "fire":
+                self.make_hit()
+
 
 class Object(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height, name=None):
@@ -312,15 +332,15 @@ def get_background(name):
     return tiles, image
 
 
-def draw(window, background, bg_image, player, player1, objects, offset_x):
+def draw(window, background, bg_image, players, objects, offset_x):
     for tile in background:
         window.blit(bg_image, tile)
 
     for obj in objects:
         obj.draw(window, offset_x)
 
-    player.draw(window, offset_x)
-    player1.draw(window, offset_x)  # Draw player1
+    for player in players:
+        player.draw(window, offset_x)
 
     pygame.display.update()
 
@@ -382,9 +402,9 @@ def handle_move_player1(player1, objects):
     collide_left = collide(player1, objects, -PLAYER_VEL * 2)
     collide_right = collide(player1, objects, PLAYER_VEL * 2)
 
-    if keys[pygame.K_a] and not collide_left:  # Use 'A' for moving left
+    if keys[pygame.K_a] and not collide_left:
         player1.move_left(PLAYER_VEL)
-    if keys[pygame.K_d] and not collide_right:  # Use 'D' for moving right
+    if keys[pygame.K_d] and not collide_right:
         player1.move_right(PLAYER_VEL)
 
     vertical_collide = handle_vertical_collision(player1, objects, player1.y_vel)
@@ -401,36 +421,32 @@ def main(window):
 
     block_size = 96
 
-    player = Player(-1500, -100, 50, 50)
-    player1 = Player1(-900, -500, 50, 50)  # Adjusted the size of Player1 to match Player
+    player = Player(-1500, 500, 50, 50)
+    player1_positions = [(-900, -100), (192,200), (1050, 100),(2000,100)]  # Define positions for Player1
+    players1 = [Player1(x, y, 50, 50) for x, y in player1_positions]  # Create Player1 instances
+
     fire = Fire(100, HEIGHT - block_size - 64, 16, 32)
     fire.on()
-    
-   
-# Add blocks at specific positions while keeping the continuous range for the rest of the screen
-    block_positions = [ (-1100, 210), (-800,400),(-895,400), (-705,400),(-610,400)]
-# Define the (x, y) coordinates where you want to place blocks
-    blocks_to_delete = []
-# Add blocks at specific positions while keeping the continuous range for the rest of the screen
-    floor = [
-    *[
-        Block(i * block_size, HEIGHT - block_size, block_size)
-        for i in range(-(WIDTH // block_size), (WIDTH * 2) // block_size)  # Generate blocks for each column of the screen
-        if i * block_size not in [x for x, _ in block_positions]  # Exclude the specific x-coordinates
-    ],
-    *[
-        Block(x, HEIGHT - block_size - y, block_size)  # Adjust y-coordinate to place the blocks above the player
-        for x, y in block_positions  # Add blocks at specific (x, y) coordinates
-    ]
-]
 
-# Delete blocks at specific positions
+    floor = [
+        *[
+            Block(i * block_size, HEIGHT - block_size, block_size)
+            for i in range(-(WIDTH // block_size), (WIDTH * 2) // block_size)
+        ],
+        *[
+            Block(x, HEIGHT - block_size - y, block_size)
+            for x, y in [(-1100, 210), (-800, 400), (-895, 400), (-705, 400), (-610, 400), (192, 288), (384, 288),
+                          (480, 288),(1440,100)]
+        ]
+    ]
+ # Define the coordinates of blocks to delete
+    blocks_to_delete = [(480,0),(384,0),(192,0),(288,0),(864,0),(768,0),(960,0)]
+
+    # Remove blocks at specified coordinates from the floor
     for x, y in blocks_to_delete:
         for block in floor[:]:  # Use floor[:] to create a copy of the list to iterate over
             if block.rect.x == x and block.rect.y == HEIGHT - block_size - y:
                 floor.remove(block)
-
-
     objects = [*floor, Block(0, HEIGHT - block_size * 2, block_size),
                Block(block_size * 3, HEIGHT - block_size * 4, block_size), fire]
 
@@ -465,11 +481,13 @@ def main(window):
                     reset_game(player)
 
         player.loop(FPS)
-        player1.loop(FPS)
+        for player1 in players1:  # Loop through each Player1 instance and update
+            player1.loop(FPS)
         fire.loop()
         handle_move(player, objects)
-        handle_move_player1(player1, objects)  # Handle movement for Player1
-        draw(window, background, bg_image, player, player1, objects, offset_x)
+        for player1 in players1:  # Loop through each Player1 instance and handle movement
+            handle_move_player1(player1, objects)
+        draw(window, background, bg_image, [player, *players1], objects, offset_x)
 
         if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
                 (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
