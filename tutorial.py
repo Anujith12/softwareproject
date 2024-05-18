@@ -12,6 +12,7 @@ pygame.display.set_caption("Platformer")
 WIDTH, HEIGHT = 1600, 800
 FPS = 60
 PLAYER_VEL = 5
+PLAYER1_VEL = 4
 
 window = pygame.display.set_mode((WIDTH, HEIGHT))
 
@@ -167,12 +168,14 @@ class Player1(pygame.sprite.Sprite):
         self.x_vel = 0
         self.y_vel = 0
         self.mask = None
-        self.direction = "left"
+        self.direction = "right"
         self.animation_count = 0
         self.fall_count = 0
         self.jump_count = 0
         self.hit = False
         self.hit_count = 0
+        self.move_delay = FPS * 2  # 2 seconds delay before changing direction
+        self.move_timer = 0
 
     def jump(self):
         self.y_vel = -self.GRAVITY * 8
@@ -213,6 +216,17 @@ class Player1(pygame.sprite.Sprite):
         self.fall_count += 1
         self.update_sprite()
 
+        # Update move timer
+        self.move_timer += 1
+
+        # Check if it's time to change direction
+        if self.move_timer >= self.move_delay:
+            self.move_timer = 0
+            if self.direction == "left":
+                self.move_right(PLAYER1_VEL)
+            else:
+                self.move_left(PLAYER1_VEL)
+
     def landed(self):
         self.fall_count = 0
         self.y_vel = 0
@@ -252,23 +266,8 @@ class Player1(pygame.sprite.Sprite):
         win.blit(self.sprite, (self.rect.x - offset_x, self.rect.y))
 
     def handle_movement(self, objects):
-        keys = pygame.key.get_pressed()
-
-        self.x_vel = 0
-        collide_left = collide(self, objects, -PLAYER_VEL * 2)
-        collide_right = collide(self, objects, PLAYER_VEL * 2)
-
-        if keys[pygame.K_a] and not collide_left:  # Use 'A' for moving left
-            self.move_left(PLAYER_VEL)
-        if keys[pygame.K_d] and not collide_right:  # Use 'D' for moving right
-            self.move_right(PLAYER_VEL)
-
-        vertical_collide = handle_vertical_collision(self, objects, self.y_vel)
-        to_check = [collide_left, collide_right, *vertical_collide]
-
-        for obj in to_check:
-            if obj and obj.name == "fire":
-                self.make_hit()
+        # No need to handle movement here as it's done in the loop method
+        pass
 
 
 class Object(pygame.sprite.Sprite):
@@ -400,16 +399,32 @@ def handle_move(player, objects):
 
 
 def handle_move_player1(player1, objects):
-    keys = pygame.key.get_pressed()
+    # Update movement based on direction and delay
+    if player1.direction == "left":
+        if player1.move_timer >= player1.move_delay:
+            player1.move_timer = 0
+            player1.move_right(PLAYER1_VEL)
+        else:
+            player1.move_left(PLAYER1_VEL)
+    elif player1.direction == "right":
+        if player1.move_timer >= player1.move_delay:
+            player1.move_timer = 0
+            player1.move_left(PLAYER1_VEL)
+        else:
+            player1.move_right(PLAYER1_VEL)
 
+    # Update movement timer
+    player1.move_timer += 1
+
+    # Handle collisions
     player1.x_vel = 0
-    collide_left = collide(player1, objects, -PLAYER_VEL * 2)
-    collide_right = collide(player1, objects, PLAYER_VEL * 2)
+    collide_left = collide(player1, objects, -PLAYER1_VEL * 1)
+    collide_right = collide(player1, objects, PLAYER1_VEL * 1)
 
-    if keys[pygame.K_a] and not collide_left:
-        player1.move_left(PLAYER_VEL)
-    if keys[pygame.K_d] and not collide_right:
-        player1.move_right(PLAYER_VEL)
+    if not collide_left and player1.direction == "left":
+        player1.move_left(PLAYER1_VEL)
+    if not collide_right and player1.direction == "right":
+        player1.move_right(PLAYER1_VEL)
 
     vertical_collide = handle_vertical_collision(player1, objects, player1.y_vel)
     to_check = [collide_left, collide_right, *vertical_collide]
