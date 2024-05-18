@@ -62,6 +62,8 @@ class Player(pygame.sprite.Sprite):
 
     def __init__(self, x, y, width, height):
         super().__init__()
+        self.original_x = x  # Store the original x position
+        self.original_y = y  # Store the original y position
         self.rect = pygame.Rect(x, y, width, height)
         self.x_vel = 0
         self.y_vel = 0
@@ -159,6 +161,8 @@ class Player1(pygame.sprite.Sprite):
 
     def __init__(self, x, y, width, height):
         super().__init__()
+        self.original_x = x  # Store the original x position
+        self.original_y = y  # Store the original y position
         self.rect = pygame.Rect(x, y, width, height)
         self.x_vel = 0
         self.y_vel = 0
@@ -451,19 +455,8 @@ def main(window):
     objects = [*floor, Block(0, HEIGHT - block_size * 2, block_size),
                Block(block_size * 3, HEIGHT - block_size * 4, block_size), fire]
 
-    offset_x = -2100
+    offset_x = 0  # Initialize offset_x to 0
     scroll_area_width = 500
-
-    def reset_game(player):
-        player.rect.x = 100
-        player.rect.y = 100
-        player.x_vel = 0
-        player.y_vel = 0
-        player.animation_count = 0
-        player.fall_count = 0
-        player.jump_count = 0
-        player.hit = False
-        player.hit_count = 0
 
     run = True
     while run:
@@ -478,21 +471,41 @@ def main(window):
                 if event.key == pygame.K_SPACE and player.jump_count < 2:
                     player.jump()
 
-                if event.key == pygame.K_r:
-                    reset_game(player)
-
+        # Update player and player1 positions
         player.loop(FPS)
-        for player1 in players1:  # Loop through each Player1 instance and update
+        for player1 in players1:
             player1.loop(FPS)
+
         fire.loop()
+
+        # Handle player movement
         handle_move(player, objects)
-        for player1 in players1:  # Loop through each Player1 instance and handle movement
+        for player1 in players1:
             handle_move_player1(player1, objects)
+
+        # Update offset_x based on player's position
+        if player.rect.x > offset_x + scroll_area_width:
+            offset_x = player.rect.x - scroll_area_width
+        elif player.rect.x < offset_x:
+            offset_x = player.rect.x
+
+        # Draw everything
         draw(window, background, bg_image, [player, *players1], objects, offset_x)
 
-        if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
-                (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
-            offset_x += player.x_vel
+        # Check if player is below the floor and reset if necessary
+        if player.rect.y > HEIGHT:
+            # Reset player position
+            player.rect.x = player.original_x
+            player.rect.y = player.original_y
+            player.x_vel = 0
+            player.y_vel = 0
+
+            # Reset Player1 positions
+            for player1 in players1:
+                player1.rect.x = player1.original_x
+                player1.rect.y = player1.original_y
+                player1.x_vel = 0
+                player1.y_vel = 0
 
     pygame.quit()
     quit()
