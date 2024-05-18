@@ -75,6 +75,9 @@ class Player(pygame.sprite.Sprite):
         self.jump_count = 0
         self.hit = False
         self.hit_count = 0
+        self.life = 3  # Player's life
+        self.max_life = 3  # Maximum life
+        self.heart_sprite = pygame.image.load(join("assets", "Heart.png")).convert_alpha()
 
     def jump(self):
         self.y_vel = -self.GRAVITY * 8
@@ -152,7 +155,21 @@ class Player(pygame.sprite.Sprite):
 
     def draw(self, win, offset_x):
         win.blit(self.sprite, (self.rect.x - offset_x, self.rect.y))
+        self.draw_hearts(win)
 
+    def draw_hearts(self, win):
+        heart_spacing = 10
+        for i in range(self.max_life):
+            heart_x = WIDTH - 130 - (i * (self.heart_sprite.get_width() + heart_spacing))
+            heart_y = 10
+            if i < self.life:
+                win.blit(self.heart_sprite, (heart_x, heart_y))
+            else:
+                # Draw empty heart for remaining life
+                empty_heart_sprite = pygame.transform.scale(self.heart_sprite, (32, 32))
+                empty_heart_sprite.fill((255, 255, 255, 0), None, pygame.BLEND_RGBA_MULT)
+                win.blit(empty_heart_sprite, (heart_x, heart_y))
+    
 
 class Player1(pygame.sprite.Sprite):
     COLOR = (0, 255, 0)  # Green color
@@ -264,10 +281,6 @@ class Player1(pygame.sprite.Sprite):
 
     def draw(self, win, offset_x):
         win.blit(self.sprite, (self.rect.x - offset_x, self.rect.y))
-
-    def handle_movement(self, objects):
-        # No need to handle movement here as it's done in the loop method
-        pass
 
 
 class Object(pygame.sprite.Sprite):
@@ -447,6 +460,8 @@ def main(window):
     fire = Fire(100, HEIGHT - block_size - 64, 16, 32)
     fire.on()
 
+    
+
     floor = [
         *[
             Block(i * block_size, HEIGHT - block_size, block_size)
@@ -469,7 +484,7 @@ def main(window):
                 floor.remove(block)
     objects = [*floor, Block(0, HEIGHT - block_size * 2, block_size),
                Block(block_size * 3, HEIGHT - block_size * 4, block_size), fire]
-
+    
     offset_x = 0  # Initialize offset_x to 0
     scroll_area_width = 500
 
