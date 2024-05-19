@@ -185,7 +185,7 @@ class Player1(pygame.sprite.Sprite):
         self.x_vel = 0
         self.y_vel = 0
         self.mask = None
-        self.direction = "right"
+        self.direction = "right"  # Default direction
         self.animation_count = 0
         self.fall_count = 0
         self.jump_count = 0
@@ -193,6 +193,21 @@ class Player1(pygame.sprite.Sprite):
         self.hit_count = 0
         self.move_delay = FPS * 2  # 2 seconds delay before changing direction
         self.move_timer = 0
+        self.saved_direction = self.direction  # Store the initial direction
+
+    def reset(self):
+        self.rect.x = self.original_x
+        self.rect.y = self.original_y
+        self.x_vel = 0
+        self.y_vel = 0
+        self.direction = self.saved_direction  # Restore the initial direction
+        self.animation_count = 0
+        self.fall_count = 0
+        self.jump_count = 0
+        self.hit = False
+        self.hit_count = 0
+        self.move_timer = 0
+
 
     def jump(self):
         self.y_vel = -self.GRAVITY * 8
@@ -427,7 +442,7 @@ def handle_move_player1(player1, objects):
             player1.move_right(PLAYER1_VEL)
 
     # Update movement timer
-    player1.move_timer += 1
+    player1.move_timer += 0.3
 
     # Handle collisions
     player1.x_vel = 0
@@ -532,10 +547,7 @@ def main(window):
 
             # Reset Player1 positions
             for player1 in players1:
-                player1.rect.x = player1.original_x
-                player1.rect.y = player1.original_y
-                player1.x_vel = 0
-                player1.y_vel = 0
+                player1.reset()
 
     pygame.quit()
     quit()
