@@ -69,7 +69,7 @@ class Player(pygame.sprite.Sprite):
         self.x_vel = 0
         self.y_vel = 0
         self.mask = None
-        self.direction = "left"
+        self.direction = "right"
         self.animation_count = 0
         self.fall_count = 0
         self.jump_count = 0
@@ -78,6 +78,24 @@ class Player(pygame.sprite.Sprite):
         self.life = 3  # Player's life
         self.max_life = 3  # Maximum life
         self.heart_sprite = pygame.image.load(join("assets", "Heart.png")).convert_alpha()
+        self.heart_empty_sprite = pygame.image.load(join("assets", "heart_empty.png")).convert_alpha()
+        self.invulnerability_duration = FPS * 1  # 1 second invulnerability duration
+        self.invulnerability_timer = 0  # Timer to track remaining invulnerability time
+
+
+        # Initialize hearts display
+        self.update_hearts()
+
+    def update_hearts(self):
+        heart_spacing = 10
+        self.hearts = []  # List to store heart images
+        for i in range(self.max_life):
+            heart_x = WIDTH - 130 - (i * (self.heart_sprite.get_width() + heart_spacing))
+            heart_y = 10
+            if i < self.life:
+                self.hearts.append((self.heart_sprite, (heart_x, heart_y)))
+            else:
+                self.hearts.append((self.heart_empty_sprite, (heart_x, heart_y)))
 
     def jump(self):
         self.y_vel = -self.GRAVITY * 8
@@ -105,17 +123,34 @@ class Player(pygame.sprite.Sprite):
             self.direction = "right"
             self.animation_count = 0
 
+    def make_hit(self):
+        if self.invulnerability_timer == 0:  # Check if player is not in invulnerable phase
+            self.hit = True
+            self.invulnerability_timer = self.invulnerability_duration  # Set invulnerability timer
+            
     def loop(self, fps):
+    # Apply gravity
         self.y_vel += min(1, (self.fall_count / fps) * self.GRAVITY)
+    # Move the player
         self.move(self.x_vel, self.y_vel)
 
+    # Check if the player is hit
         if self.hit:
             self.hit_count += 1
+    # Check if the hit cooldown has expired
         if self.hit_count > fps * 2:
             self.hit = False
             self.hit_count = 0
 
+            
+    # Increase fall count
         self.fall_count += 1
+
+    # Decrease invulnerability timer if player is in invulnerable phase
+        if self.invulnerability_timer > 0:
+            self.invulnerability_timer -= 1
+
+    # Update player sprite
         self.update_sprite()
 
     def landed(self):
@@ -158,18 +193,18 @@ class Player(pygame.sprite.Sprite):
         self.draw_hearts(win)
 
     def draw_hearts(self, win):
+        heart_sprite = pygame.image.load(join("assets", "Heart.png")).convert_alpha()
+        heart_empty_sprite = pygame.image.load(join("assets", "heart_empty.png")).convert_alpha()
         heart_spacing = 10
         for i in range(self.max_life):
-            heart_x = WIDTH - 130 - (i * (self.heart_sprite.get_width() + heart_spacing))
+            heart_x = WIDTH - 130 - (i * (heart_sprite.get_width() + heart_spacing))
             heart_y = 10
             if i < self.life:
-                win.blit(self.heart_sprite, (heart_x, heart_y))
+                win.blit(heart_sprite, (heart_x, heart_y))
             else:
                 # Draw empty heart for remaining life
-                empty_heart_sprite = pygame.transform.scale(self.heart_sprite, (32, 32))
-                empty_heart_sprite.fill((255, 255, 255, 0), None, pygame.BLEND_RGBA_MULT)
-                win.blit(empty_heart_sprite, (heart_x, heart_y))
-    
+                win.blit(heart_empty_sprite, (heart_x, heart_y))
+
 
 class Player1(pygame.sprite.Sprite):
     COLOR = (0, 255, 0)  # Green color
@@ -528,6 +563,28 @@ def main(window):
         for player1 in players1:
             handle_move_player1(player1, objects)
 
+        # Collision detection with Player1
+        for player1 in players1:
+            # Check if player collides with player1 on the sides (x-axis)
+            if pygame.sprite.collide_rect(player, player1):
+                if player.rect.right >= player1.rect.left or player.rect.left <= player1.rect.right:
+                    # Check if player is in invulnerable phase
+                    if player.invulnerability_timer == 0:
+                # Player is vulnerable, apply hit
+                        player.make_hit()
+                        player.life -= 1
+                        if player.life <= 0:
+                    # Game over logic here
+                            pass
+                # Set invulnerability timer
+                player.invulnerability_timer = player.invulnerability_duration
+
+                        
+
+            # Check if player collides with player1 on top (y-axis)
+            if player.rect.bottom <= player1.rect.top and pygame.sprite.collide_rect(player, player1):
+                # Remove player1 from the list of players
+                players1.remove(player1)
         # Update offset_x based on player's position
         if player.rect.x > offset_x + scroll_area_width:
             offset_x = player.rect.x - scroll_area_width
@@ -545,9 +602,13 @@ def main(window):
             player.x_vel = 0
             player.y_vel = 0
 
+            # Reset player life
+            player.life = 3
             # Reset Player1 positions
             for player1 in players1:
                 player1.reset()
+# Update player's hearts display after reset
+            player.update_hearts()
 
     pygame.quit()
     quit()
