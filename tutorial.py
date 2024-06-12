@@ -4,6 +4,7 @@ import math
 import pygame
 from os import listdir
 from os.path import isfile, join
+
 pygame.init()
 
 pygame.display.set_caption("Platformer")
@@ -11,6 +12,7 @@ pygame.display.set_caption("Platformer")
 WIDTH, HEIGHT = 1600, 800
 FPS = 60
 PLAYER_VEL = 5
+PLAYER1_VEL = 4
 
 window = pygame.display.set_mode((WIDTH, HEIGHT))
 
@@ -61,16 +63,39 @@ class Player(pygame.sprite.Sprite):
 
     def __init__(self, x, y, width, height):
         super().__init__()
+        self.original_x = x  # Store the original x position
+        self.original_y = y  # Store the original y position
         self.rect = pygame.Rect(x, y, width, height)
         self.x_vel = 0
         self.y_vel = 0
         self.mask = None
-        self.direction = "left"
+        self.direction = "right"
         self.animation_count = 0
         self.fall_count = 0
         self.jump_count = 0
         self.hit = False
         self.hit_count = 0
+        self.life = 3  # Player's life
+        self.max_life = 3  # Maximum life
+        self.heart_sprite = pygame.image.load(join("assets", "Heart.png")).convert_alpha()
+        self.heart_empty_sprite = pygame.image.load(join("assets", "heart_empty.png")).convert_alpha()
+        self.invulnerability_duration = FPS * 1  # 1 second invulnerability duration
+        self.invulnerability_timer = 0  # Timer to track remaining invulnerability time
+
+
+        # Initialize hearts display
+        self.update_hearts()
+
+    def update_hearts(self):
+        heart_spacing = 10
+        self.hearts = []  # List to store heart images
+        for i in range(self.max_life):
+            heart_x = WIDTH - 130 - (i * (self.heart_sprite.get_width() + heart_spacing))
+            heart_y = 10
+            if i < self.life:
+                self.hearts.append((self.heart_sprite, (heart_x, heart_y)))
+            else:
+                self.hearts.append((self.heart_empty_sprite, (heart_x, heart_y)))
 
     def jump(self):
         self.y_vel = -self.GRAVITY * 8
@@ -98,17 +123,34 @@ class Player(pygame.sprite.Sprite):
             self.direction = "right"
             self.animation_count = 0
 
+    def make_hit(self):
+        if self.invulnerability_timer == 0:  # Check if player is not in invulnerable phase
+            self.hit = True
+            self.invulnerability_timer = self.invulnerability_duration  # Set invulnerability timer
+            
     def loop(self, fps):
+    # Apply gravity
         self.y_vel += min(1, (self.fall_count / fps) * self.GRAVITY)
+    # Move the player
         self.move(self.x_vel, self.y_vel)
 
+    # Check if the player is hit
         if self.hit:
             self.hit_count += 1
+    # Check if the hit cooldown has expired
         if self.hit_count > fps * 2:
             self.hit = False
             self.hit_count = 0
 
+            
+    # Increase fall count
         self.fall_count += 1
+
+    # Decrease invulnerability timer if player is in invulnerable phase
+        if self.invulnerability_timer > 0:
+            self.invulnerability_timer -= 1
+
+    # Update player sprite
         self.update_sprite()
 
     def landed(self):
@@ -148,6 +190,20 @@ class Player(pygame.sprite.Sprite):
 
     def draw(self, win, offset_x):
         win.blit(self.sprite, (self.rect.x - offset_x, self.rect.y))
+        self.draw_hearts(win)
+
+    def draw_hearts(self, win):
+        heart_sprite = pygame.image.load(join("assets", "Heart.png")).convert_alpha()
+        heart_empty_sprite = pygame.image.load(join("assets", "heart_empty.png")).convert_alpha()
+        heart_spacing = 10
+        for i in range(self.max_life):
+            heart_x = WIDTH - 130 - (i * (heart_sprite.get_width() + heart_spacing))
+            heart_y = 10
+            if i < self.life:
+                win.blit(heart_sprite, (heart_x, heart_y))
+            else:
+                # Draw empty heart for remaining life
+                win.blit(heart_empty_sprite, (heart_x, heart_y))
 
 
 class Player1(pygame.sprite.Sprite):
@@ -158,16 +214,35 @@ class Player1(pygame.sprite.Sprite):
 
     def __init__(self, x, y, width, height):
         super().__init__()
+        self.original_x = x  # Store the original x position
+        self.original_y = y  # Store the original y position
         self.rect = pygame.Rect(x, y, width, height)
         self.x_vel = 0
         self.y_vel = 0
         self.mask = None
-        self.direction = "left"
+        self.direction = "right"  # Default direction
         self.animation_count = 0
         self.fall_count = 0
         self.jump_count = 0
         self.hit = False
         self.hit_count = 0
+        self.move_delay = FPS * 2  # 2 seconds delay before changing direction
+        self.move_timer = 0
+        self.saved_direction = self.direction  # Store the initial direction
+
+    def reset(self):
+        self.rect.x = self.original_x
+        self.rect.y = self.original_y
+        self.x_vel = 0
+        self.y_vel = 0
+        self.direction = self.saved_direction  # Restore the initial direction
+        self.animation_count = 0
+        self.fall_count = 0
+        self.jump_count = 0
+        self.hit = False
+        self.hit_count = 0
+        self.move_timer = 0
+
 
     def jump(self):
         self.y_vel = -self.GRAVITY * 8
@@ -207,6 +282,17 @@ class Player1(pygame.sprite.Sprite):
 
         self.fall_count += 1
         self.update_sprite()
+
+        # Update move timer
+        self.move_timer += 1
+
+        # Check if it's time to change direction
+        if self.move_timer >= self.move_delay:
+            self.move_timer = 0
+            if self.direction == "left":
+                self.move_right(PLAYER1_VEL)
+            else:
+                self.move_left(PLAYER1_VEL)
 
     def landed(self):
         self.fall_count = 0
@@ -312,15 +398,15 @@ def get_background(name):
     return tiles, image
 
 
-def draw(window, background, bg_image, player, player1, objects, offset_x):
+def draw(window, background, bg_image, players, objects, offset_x):
     for tile in background:
         window.blit(bg_image, tile)
 
     for obj in objects:
         obj.draw(window, offset_x)
 
-    player.draw(window, offset_x)
-    player1.draw(window, offset_x)  # Draw player1
+    for player in players:
+        player.draw(window, offset_x)
 
     pygame.display.update()
 
@@ -376,16 +462,32 @@ def handle_move(player, objects):
 
 
 def handle_move_player1(player1, objects):
-    keys = pygame.key.get_pressed()
+    # Update movement based on direction and delay
+    if player1.direction == "left":
+        if player1.move_timer >= player1.move_delay:
+            player1.move_timer = 0
+            player1.move_right(PLAYER1_VEL)
+        else:
+            player1.move_left(PLAYER1_VEL)
+    elif player1.direction == "right":
+        if player1.move_timer >= player1.move_delay:
+            player1.move_timer = 0
+            player1.move_left(PLAYER1_VEL)
+        else:
+            player1.move_right(PLAYER1_VEL)
 
+    # Update movement timer
+    player1.move_timer += 0.3
+
+    # Handle collisions
     player1.x_vel = 0
-    collide_left = collide(player1, objects, -PLAYER_VEL * 2)
-    collide_right = collide(player1, objects, PLAYER_VEL * 2)
+    collide_left = collide(player1, objects, -PLAYER1_VEL * 1)
+    collide_right = collide(player1, objects, PLAYER1_VEL * 1)
 
-    if keys[pygame.K_a] and not collide_left:  # Use 'A' for moving left
-        player1.move_left(PLAYER_VEL)
-    if keys[pygame.K_d] and not collide_right:  # Use 'D' for moving right
-        player1.move_right(PLAYER_VEL)
+    if not collide_left and player1.direction == "left":
+        player1.move_left(PLAYER1_VEL)
+    if not collide_right and player1.direction == "right":
+        player1.move_right(PLAYER1_VEL)
 
     vertical_collide = handle_vertical_collision(player1, objects, player1.y_vel)
     to_check = [collide_left, collide_right, *vertical_collide]
@@ -401,52 +503,40 @@ def main(window):
 
     block_size = 96
 
-    player = Player(-1500, -100, 50, 50)
-    player1 = Player1(-900, -500, 50, 50)  # Adjusted the size of Player1 to match Player
+    player = Player(-1500, 500, 50, 50)
+    player1_positions = [(-900, -100), (192,200), (1050, 100),(1718,100),(2310,100)]  # Define positions for Player1
+    players1 = [Player1(x, y, 50, 50) for x, y in player1_positions]  # Create Player1 instances
+
     fire = Fire(100, HEIGHT - block_size - 64, 16, 32)
     fire.on()
-    
-   
-# Add blocks at specific positions while keeping the continuous range for the rest of the screen
-    block_positions = [ (-1100, 210), (-800,400),(-895,400), (-705,400),(-610,400)]
-# Define the (x, y) coordinates where you want to place blocks
-    blocks_to_delete = []
-# Add blocks at specific positions while keeping the continuous range for the rest of the screen
-    floor = [
-    *[
-        Block(i * block_size, HEIGHT - block_size, block_size)
-        for i in range(-(WIDTH // block_size), (WIDTH * 2) // block_size)  # Generate blocks for each column of the screen
-        if i * block_size not in [x for x, _ in block_positions]  # Exclude the specific x-coordinates
-    ],
-    *[
-        Block(x, HEIGHT - block_size - y, block_size)  # Adjust y-coordinate to place the blocks above the player
-        for x, y in block_positions  # Add blocks at specific (x, y) coordinates
-    ]
-]
 
-# Delete blocks at specific positions
+    
+
+    floor = [
+        *[
+            Block(i * block_size, HEIGHT - block_size, block_size)
+            for i in range(-(WIDTH // block_size), (WIDTH * 2) // block_size)
+        ],
+        *[
+            Block(x, HEIGHT - block_size - y, block_size)
+            for x, y in [(-1100, 210), (-800, 400), (-895, 400), (-705, 400), (-610, 400), (192, 288), (384, 288),
+                          (480, 288),(2120,260),(2120,355),(2215,260),(2215,355),(2215,450),(2120,450),(2400,96),(2496,96),(2496,192),(2592,96),(2592,192),(2592,288),
+                          (2688,96),(2688,192),(2688,288),(2688,384),(2784,96),(2784,192),(2784,288),(2784,384),(2784,480),(2880,96),(2880,192),(2880,288),(2880,384),(2880,480),(2976,96),(2976,192),(2976,288),(2976,384),(2976,480)]
+        ]
+    ]
+ # Define the coordinates of blocks to delete
+    blocks_to_delete = [(480,0),(384,0),(192,0),(288,0),(864,0),(768,0),(960,0),(1440,0),(1536,0),(1632,0)]
+
+    # Remove blocks at specified coordinates from the floor
     for x, y in blocks_to_delete:
         for block in floor[:]:  # Use floor[:] to create a copy of the list to iterate over
             if block.rect.x == x and block.rect.y == HEIGHT - block_size - y:
                 floor.remove(block)
-
-
     objects = [*floor, Block(0, HEIGHT - block_size * 2, block_size),
                Block(block_size * 3, HEIGHT - block_size * 4, block_size), fire]
-
-    offset_x = -2100
+    
+    offset_x = 0  # Initialize offset_x to 0
     scroll_area_width = 500
-
-    def reset_game(player):
-        player.rect.x = 100
-        player.rect.y = 100
-        player.x_vel = 0
-        player.y_vel = 0
-        player.animation_count = 0
-        player.fall_count = 0
-        player.jump_count = 0
-        player.hit = False
-        player.hit_count = 0
 
     run = True
     while run:
@@ -461,19 +551,64 @@ def main(window):
                 if event.key == pygame.K_SPACE and player.jump_count < 2:
                     player.jump()
 
-                if event.key == pygame.K_r:
-                    reset_game(player)
-
+        # Update player and player1 positions
         player.loop(FPS)
-        player1.loop(FPS)
-        fire.loop()
-        handle_move(player, objects)
-        handle_move_player1(player1, objects)  # Handle movement for Player1
-        draw(window, background, bg_image, player, player1, objects, offset_x)
+        for player1 in players1:
+            player1.loop(FPS)
 
-        if ((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or (
-                (player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
-            offset_x += player.x_vel
+        fire.loop()
+
+        # Handle player movement
+        handle_move(player, objects)
+        for player1 in players1:
+            handle_move_player1(player1, objects)
+
+        # Collision detection with Player1
+        for player1 in players1:
+            # Check if player collides with player1 on the sides (x-axis)
+            if pygame.sprite.collide_rect(player, player1):
+                if player.rect.right >= player1.rect.left or player.rect.left <= player1.rect.right:
+                    # Check if player is in invulnerable phase
+                    if player.invulnerability_timer == 0:
+                # Player is vulnerable, apply hit
+                        player.make_hit()
+                        player.life -= 1
+                        if player.life <= 0:
+                    # Game over logic here
+                            pass
+                # Set invulnerability timer
+                player.invulnerability_timer = player.invulnerability_duration
+
+                        
+
+            # Check if player collides with player1 on top (y-axis)
+            if player.rect.bottom <= player1.rect.top and pygame.sprite.collide_rect(player, player1):
+                # Remove player1 from the list of players
+                players1.remove(player1)
+        # Update offset_x based on player's position
+        if player.rect.x > offset_x + scroll_area_width:
+            offset_x = player.rect.x - scroll_area_width
+        elif player.rect.x < offset_x:
+            offset_x = player.rect.x
+
+        # Draw everything
+        draw(window, background, bg_image, [player, *players1], objects, offset_x)
+
+        # Check if player is below the floor and reset if necessary
+        if player.rect.y > HEIGHT:
+            # Reset player position
+            player.rect.x = player.original_x
+            player.rect.y = player.original_y
+            player.x_vel = 0
+            player.y_vel = 0
+
+            # Reset player life
+            player.life = 3
+            # Reset Player1 positions
+            for player1 in players1:
+                player1.reset()
+# Update player's hearts display after reset
+            player.update_hearts()
 
     pygame.quit()
     quit()
